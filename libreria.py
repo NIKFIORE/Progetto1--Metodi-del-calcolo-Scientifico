@@ -4,8 +4,7 @@ from scipy.io import mmread
 
 class IterativeSolvers:
     """
-    Libreria di metodi iterativi per la risoluzione di sistemi lineari Ax = b
-    dove A è una matrice simmetrica e definita positiva.
+    Libreria di metodi iterativi per la risoluzione di sistemi lineari Ax = b dove A è una matrice simmetrica e definita positiva.
     """
     
     @staticmethod
