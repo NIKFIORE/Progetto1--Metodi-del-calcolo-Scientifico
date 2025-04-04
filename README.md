@@ -13,15 +13,15 @@ Il progetto richiede l'implementazione di una mini libreria per la risoluzione d
 - Utilizzare un linguaggio di programmazione a scelta (C++, Fortran, Java, Python, ecc.).  
 - Partire da una libreria open-source (Eigen, Armadillo, BLAS/LAPACK) solo per la gestione di vettori e matrici, **senza usare metodi preimplementati** per la risoluzione dei sistemi.  
 - I metodi iterativi devono partire da un vettore iniziale nullo e arrestarsi quando:  
-  - L'errore relativo \( ||Ax^{(k)} - b|| / ||b|| \) è inferiore a una tolleranza \( \text{tol} \).  
+  - L'errore relativo \( ||Ax^{(k)} - b|| / ||b|| \) è inferiore a una tolleranza .  
   - Il numero massimo di iterazioni (minimo **20000**) è raggiunto.  
 
 #### **Formato dell'eseguibile:**  
 L'eseguibile dovrà accettare in input:  
-- Una **matrice** \( A \) (simmetrica e definita positiva).  
-- Un **vettore** \( b \) (termine noto).  
-- Un **vettore soluzione esatta** \( x \).  
-- Una **tolleranza** \( \text{tol} \).  
+- Una **matrice** (A) (simmetrica e definita positiva).  
+- Un **vettore** (b) (termine noto).  
+- Un **vettore soluzione esatta** (x).  
+- Una **tolleranza** (tol).  
 
 Dovrà quindi eseguire tutti i metodi e restituire:  
 - **Errore relativo** tra la soluzione esatta e quella calcolata.  
@@ -31,4 +31,4 @@ Dovrà quindi eseguire tutti i metodi e restituire:
 #### **Validazione e test:**  
 - Applicare il codice alle **matrici sparse** fornite nei file `.mtx` (spa1.mtx, spa2.mtx, vem1.mtx, vem2.mtx).  
 - Eseguire test con diverse tolleranze:  
-  - \( 10^{-4}, 10^{-6}, 10^{-8}, 10^{-10} \).  
+  - 10^{-4}, 10^{-6}, 10^{-8}, 10^{-10}.  
