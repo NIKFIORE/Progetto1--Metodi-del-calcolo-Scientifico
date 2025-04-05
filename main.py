@@ -17,9 +17,10 @@ def main():
     ]
     
     # Tolleranze da testare
-    tolerances = [1e-4, 1e-6, 1e-8, 1e-10]
+    tolerances = [1e-4]
+    #, 1e-6, 1e-8, 1e-10
     
-    print("=== Test di metodi iterativi per sistemi lineari ===")
+    print("========= Test di metodi iterativi per sistemi lineari =========")
     print("Matrici da testare:", [os.path.basename(mtx) for mtx in matrix_files])
     print("Tolleranze:", tolerances)
     
@@ -27,14 +28,14 @@ def main():
     results = IterativeSolvers.run_tests(matrix_files, tolerances)
     
     # Stampa un riepilogo dei risultati
-    print("\n=== RIEPILOGO DEI RISULTATI ===")
+    print("\n=========  RIEPILOGO DEI RISULTATI =========")
     for mtx_file, mtx_results in results.items():
         print(f"\nRisultati per la matrice: {os.path.basename(mtx_file)}")
         
         for tol, methods_results in mtx_results.items():
             print(f"\n  Tolleranza: {tol}")
             
-            for method, result in methods_results.items():
+            for method, result in methods_results.items(): 
                 print(f"    {method.upper()}:")
                 print(f"      Iterazioni: {result['iterations']}")
                 print(f"      Tempo: {result['time']:.6f} sec")

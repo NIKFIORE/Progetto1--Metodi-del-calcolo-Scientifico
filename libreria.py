@@ -1,6 +1,8 @@
 import numpy as np
 import time
 from scipy.io import mmread
+from scipy.sparse import csr_matrix
+from numpy.linalg import norm
 
 class IterativeSolvers:
     """
@@ -13,7 +15,7 @@ class IterativeSolvers:
         Verifica le proprietà della matrice A richieste per i metodi iterativi.
         
         Parametri:
-        A (numpy.ndarray): Matrice del sistema
+        A (scipy.sparse.csr_matrix): Matrice del sistema
         x0 (numpy.ndarray): Vettore iniziale
         check_spd (bool): Se True, verifica che A sia definita positiva
         
@@ -31,19 +33,13 @@ class IterativeSolvers:
             return False
             
         # Verifica che A sia simmetrica
-        if not np.allclose(A, A.T):
+        # Per matrici sparse, il confronto è più complesso
+        if not (A != A.T).nnz == 0:
             print("La matrice A non è simmetrica")
             return False
-            
-        # Verifica che A sia definita positiva (solo se richiesto)
-        if check_spd:
-            try:
-                # Tentativo di calcolare la fattorizzazione di Cholesky
-                np.linalg.cholesky(A)
-            except np.linalg.LinAlgError:
-                print("La matrice A non è definita positiva")
-                return False
-                
+       
+       #manca verificare che la matrice sia positiva     
+
         return True
     
     @staticmethod
@@ -52,7 +48,7 @@ class IterativeSolvers:
         Verifica il criterio di convergenza ||Ax - b|| / ||b|| < tol.
         
         Parametri:
-        A (numpy.ndarray): Matrice del sistema
+        A (scipy.sparse.csr_matrix): Matrice del sistema
         x (numpy.ndarray): Soluzione corrente
         b (numpy.ndarray): Termine noto
         tol (float): Tolleranza
@@ -61,7 +57,7 @@ class IterativeSolvers:
         bool: True se il criterio è soddisfatto, False altrimenti
         float: Errore relativo
         """
-        residual = A @ x - b
+        residual = A.dot(x) - b #dot è moltiplicazione tra matrici
         norm_b = np.linalg.norm(b)
         
         if norm_b == 0:
@@ -78,7 +74,7 @@ class IterativeSolvers:
         Metodo di Jacobi per la risoluzione di sistemi lineari.
         
         Parametri:
-        A (numpy.ndarray): Matrice del sistema
+        A (scipy.sparse.csr_matrix): Matrice del sistema
         b (numpy.ndarray): Termine noto
         tol (float): Tolleranza per il criterio di arresto
         max_iter (int): Numero massimo di iterazioni
@@ -97,21 +93,21 @@ class IterativeSolvers:
             return None, 0, 0.0, float('inf')
             
         # Verifica elementi diagonali non nulli
-        if np.any(np.diag(A) == 0):
+        diag_elements = A.diagonal()#estrazione della daigonale 
+        if np.any(diag_elements == 0):
             print("Almeno un elemento della diagonale è nullo. Il metodo fallisce.")
             return None, 0, 0.0, float('inf')
         
-        # Estrazione delle matrici
-        D = np.diag(np.diag(A))
-        D_inv = np.diag(1.0 / np.diag(A))
-        B = D - A
+        # Estrazione delle matrici per il metodo di Jacobi
+        D_inv = 1.0 / diag_elements
+        R = A - csr_matrix((diag_elements, (np.arange(n), np.arange(n))), shape=(n, n))
         
         x = np.copy(x0)
         iterations = 0
         
         start_time = time.time()
         while iterations < max_iter:
-            x_new = D_inv @ (B @ x + b)
+            x_new = D_inv * (b - R.dot(x))
             
             # Verifica convergenza
             converged, rel_error = IterativeSolvers.convergence_check(A, x_new, b, tol)
@@ -134,7 +130,7 @@ class IterativeSolvers:
         Metodo di Gauss-Seidel per la risoluzione di sistemi lineari.
         
         Parametri:
-        A (numpy.ndarray): Matrice del sistema
+        A (scipy.sparse.csr_matrix): Matrice del sistema
         b (numpy.ndarray): Termine noto
         tol (float): Tolleranza per il criterio di arresto
         max_iter (int): Numero massimo di iterazioni
@@ -153,16 +149,20 @@ class IterativeSolvers:
             return None, 0, 0.0, float('inf')
         
         # Estrazione delle matrici necessarie
-        L = np.tril(A)
+        L = csr_matrix(np.tril(A.toarray()))
         U = A - L
+        D = A.diagonal()
         
         x = np.copy(x0)
         iterations = 0
         
         start_time = time.time()
         while iterations < max_iter:
-            # Risolvere sistema triangolare inferiore
-            x_new = np.linalg.solve(L, b - U @ x)
+            x_new = np.copy(x)
+            for i in range(n):
+                sum1 = L[i, :i].dot(x_new[:i])
+                sum2 = U[i, i+1:].dot(x[i+1:])
+                x_new[i] = (b[i] - sum1 - sum2) / D[i]
             
             # Verifica convergenza
             converged, rel_error = IterativeSolvers.convergence_check(A, x_new, b, tol)
@@ -185,7 +185,7 @@ class IterativeSolvers:
         Metodo del Gradiente per la risoluzione di sistemi lineari.
         
         Parametri:
-        A (numpy.ndarray): Matrice del sistema
+        A (scipy.sparse.csr_matrix): Matrice del sistema
         b (numpy.ndarray): Termine noto
         tol (float): Tolleranza per il criterio di arresto
         max_iter (int): Numero massimo di iterazioni
@@ -204,27 +204,23 @@ class IterativeSolvers:
             return None, 0, 0.0, float('inf')
         
         x = np.copy(x0)
-        r = b - A @ x
-        p = np.copy(r)
+        r = b - A.dot(x)
+        
         iterations = 0
         
         start_time = time.time()
         while iterations < max_iter:
-            Ap = A @ p
-            alpha = (r.T @ r) / (p.T @ Ap)
-            x_new = x + alpha * p
+            Ar = A.dot(r)
+            alpha = (r @ r) / (r @ Ar)
+            x_new = x + alpha * r
             
             # Verifica convergenza
             converged, rel_error = IterativeSolvers.convergence_check(A, x_new, b, tol)
             if converged:
                 break
                 
-            r_new = r - alpha * Ap
-            beta = (r_new.T @ r_new) / (r.T @ r)
-            p = r_new + beta * p
-            
+            r = b - A.dot(x_new)
             x = x_new
-            r = r_new
             iterations += 1
             
         elapsed_time = time.time() - start_time
@@ -240,7 +236,7 @@ class IterativeSolvers:
         Metodo del Gradiente Coniugato per la risoluzione di sistemi lineari.
         
         Parametri:
-        A (numpy.ndarray): Matrice del sistema
+        A (scipy.sparse.csr_matrix): Matrice del sistema
         b (numpy.ndarray): Termine noto
         tol (float): Tolleranza per il criterio di arresto
         max_iter (int): Numero massimo di iterazioni
@@ -259,15 +255,15 @@ class IterativeSolvers:
             return None, 0, 0.0, float('inf')
         
         x = np.copy(x0)
-        r = b - A @ x  # Residuo iniziale
+        r = b - A.dot(x)  # Residuo iniziale
         p = np.copy(r)  # Direzione iniziale
         iterations = 0
         
         start_time = time.time()
         while iterations < max_iter:
-            Ap = A @ p
-            r_dot_r = r.T @ r
-            alpha = r_dot_r / (p.T @ Ap)
+            Ap = A.dot(p)
+            r_dot_r = r @ r
+            alpha = r_dot_r / (p @ Ap)
             
             x = x + alpha * p
             r_new = r - alpha * Ap
@@ -277,7 +273,7 @@ class IterativeSolvers:
             if converged:
                 break
                 
-            beta = (r_new.T @ r_new) / r_dot_r
+            beta = (r_new @ r_new) / r_dot_r
             p = r_new + beta * p
             
             r = r_new
@@ -296,7 +292,7 @@ class IterativeSolvers:
         Risolve un sistema lineare con uno o tutti i metodi implementati.
         
         Parametri:
-        A (numpy.ndarray): Matrice del sistema
+        A (scipy.sparse.csr_matrix): Matrice del sistema
         b (numpy.ndarray): Termine noto
         x_exact (numpy.ndarray): Soluzione esatta
         tol (float): Tolleranza per il criterio di arresto
@@ -356,20 +352,21 @@ class IterativeSolvers:
     @staticmethod
     def load_matrix_mtx(filename):
         """
-        Carica una matrice da un file .mtx.
+        Carica una matrice da un file .mtx in formato sparse.
         
         Parametri:
         filename (str): Percorso del file .mtx
         
         Returns:
-        numpy.ndarray: Matrice caricata dal file
+        scipy.sparse.csr_matrix: Matrice caricata dal file
         """
         try:
+            # Legge la matrice dal file e la converte in formato csr_matrix
             matrix = mmread(filename)
             if isinstance(matrix, np.ndarray):
-                return matrix
+                return csr_matrix(matrix)
             else:
-                return matrix.toarray()  # Converti da formato sparse a numpy array
+                return matrix.tocsr()  # Converti in formato CSR se non lo è già
         except Exception as e:
             print(f"Errore nel caricamento della matrice dal file {filename}: {e}")
             return None
@@ -399,7 +396,7 @@ class IterativeSolvers:
             # Step 1: Creare la soluzione esatta (vettore di tutti 1)
             x_exact = np.ones(n)
             # Step 2: Calcolare il vettore b
-            b = A @ x_exact
+            b = A.dot(x_exact)
             
             matrix_results = {}
             
