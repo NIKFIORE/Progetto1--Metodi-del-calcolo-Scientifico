@@ -3,6 +3,7 @@ import time
 from scipy.io import mmread
 from scipy.sparse import csr_matrix
 from numpy.linalg import norm
+from scipy import linalg
 
 class IterativeSolvers:
     """
@@ -38,7 +39,21 @@ class IterativeSolvers:
             print("La matrice A non è simmetrica")
             return False
        
-       #manca verificare che la matrice sia positiva     
+        # Verifica elementi diagonali non nulli
+        diag_elements = A.diagonal()
+        if np.any(diag_elements == 0):
+            print("Almeno un elemento della diagonale è nullo. Il metodo fallisce.")
+            return False
+            
+        # Verifica che la matrice sia definita positiva usando la decomposizione di Cholesky
+        if check_spd:
+            try:
+                # Convertiamo la matrice in formato denso per la decomposizione di Cholesky
+                A_dense = A.toarray()
+                linalg.cholesky(A_dense)
+            except linalg.LinAlgError:
+                print("La matrice A non è definita positiva")
+                return False
 
         return True
     
@@ -93,7 +108,7 @@ class IterativeSolvers:
             return None, 0, 0.0, float('inf')
             
         # Verifica elementi diagonali non nulli
-        diag_elements = A.diagonal()#estrazione della daigonale 
+        diag_elements = A.diagonal()
         if np.any(diag_elements == 0):
             print("Almeno un elemento della diagonale è nullo. Il metodo fallisce.")
             return None, 0, 0.0, float('inf')
@@ -125,7 +140,7 @@ class IterativeSolvers:
         return x, iterations, elapsed_time, rel_error
     
     @staticmethod
-    def gauss_seidel(A, b, tol=1e-6, max_iter=20000):
+    def gauss_seidel_DELPROF(A, b, tol=1e-6, max_iter=20000):
         """
         Metodo di Gauss-Seidel per la risoluzione di sistemi lineari.
         
@@ -179,6 +194,75 @@ class IterativeSolvers:
         
         return x, iterations, elapsed_time, rel_error
     
+    @staticmethod
+    def gauss_seidel(A, b, tol=1e-6, max_iter=20000):
+        """
+        Metodo di Gauss-Seidel ottimizzato per la risoluzione di sistemi lineari.
+        
+        Parametri:
+        A (scipy.sparse.csr_matrix): Matrice del sistema
+        b (numpy.ndarray): Termine noto
+        tol (float): Tolleranza per il criterio di arresto
+        max_iter (int): Numero massimo di iterazioni
+        
+        Returns:
+        numpy.ndarray: Soluzione approssimata
+        int: Numero di iterazioni eseguite
+        float: Tempo di calcolo in secondi
+        float: Errore relativo finale
+        """
+        n = len(b)
+        x = np.zeros(n)  # Vettore iniziale nullo
+        
+        # Verifica proprietà della matrice
+        if not IterativeSolvers.check_matrix_properties(A, x):
+            return None, 0, 0.0, float('inf')
+        
+        # Estrai i valori diagonali una sola volta
+        diag = A.diagonal()
+        
+        # Verifica elementi diagonali non nulli
+        if np.any(diag == 0):
+            print("Almeno un elemento della diagonale è nullo. Il metodo fallisce.")
+            return None, 0, 0.0, float('inf')
+        
+        # Pre-estrai gli indici e i valori della matrice sparse
+        # per un accesso più efficiente
+        A_data = A.data
+        A_indices = A.indices
+        A_indptr = A.indptr
+        
+        iterations = 0
+        start_time = time.time()
+        
+        while iterations < max_iter:
+            for i in range(n):
+                # Calcola Ax (senza l'elemento diagonale)
+                row_start, row_end = A_indptr[i], A_indptr[i+1]
+                sum_val = 0.0
+                
+                for j_idx in range(row_start, row_end):
+                    j = A_indices[j_idx]
+                    if i != j:  # Salta l'elemento diagonale
+                        sum_val += A_data[j_idx] * x[j]
+                
+                # Aggiorna x[i]
+                x[i] = (b[i] - sum_val) / diag[i]
+            
+            # Verifica convergenza
+            converged, rel_error = IterativeSolvers.convergence_check(A, x, b, tol)
+            if converged:
+                break
+                
+            iterations += 1
+        
+        elapsed_time = time.time() - start_time
+        
+        if iterations == max_iter:
+            print(f"Il metodo di Gauss-Seidel non ha raggiunto la convergenza in {max_iter} iterazioni.")
+        
+        return x, iterations, elapsed_time, rel_error
+     
     @staticmethod
     def gradient_method(A, b, tol=1e-6, max_iter=20000):
         """
@@ -253,38 +337,36 @@ class IterativeSolvers:
         # Verifica proprietà della matrice
         if not IterativeSolvers.check_matrix_properties(A, x0):
             return None, 0, 0.0, float('inf')
-        
-        x = np.copy(x0)
-        r = b - A.dot(x)  # Residuo iniziale
-        p = np.copy(r)  # Direzione iniziale
-        iterations = 0
+            
+        nit = 0
+        err = 1
+        xold = x0
+        rold = b - A @ xold
+        pold = rold
         
         start_time = time.time()
-        while iterations < max_iter:
-            Ap = A.dot(p)
-            r_dot_r = r @ r
-            alpha = r_dot_r / (p @ Ap)
+        
+        while nit < max_iter and err > tol:
+            Ap = A @ pold
+            step = (pold @ rold) / (pold @ Ap)  # calcolo della lunghezza del passo
+            xnew = xold + step * pold          # aggiornamento della soluzione
+            rnew = rold - step * Ap            # aggiornamento del residuo
+            beta = (Ap @ rnew) / (Ap @ pold)   # calcolo del passo per la nuova direzione
+            pnew = rnew - beta * pold
+            err = np.linalg.norm(b - A @ xnew) / np.linalg.norm(b)  # errore relativo
             
-            x = x + alpha * p
-            r_new = r - alpha * Ap
-            
-            # Verifica convergenza
-            converged, rel_error = IterativeSolvers.convergence_check(A, x, b, tol)
-            if converged:
-                break
-                
-            beta = (r_new @ r_new) / r_dot_r
-            p = r_new + beta * p
-            
-            r = r_new
-            iterations += 1
+            # aggiornamenti
+            xold = xnew
+            rold = rnew
+            pold = pnew
+            nit += 1
             
         elapsed_time = time.time() - start_time
         
-        if iterations == max_iter:
+        if nit == max_iter:
             print(f"Il metodo del Gradiente Coniugato non ha raggiunto la convergenza in {max_iter} iterazioni.")
         
-        return x, iterations, elapsed_time, rel_error
+        return xnew, nit, elapsed_time, err
     
     @staticmethod
     def solve_system(A, b, x_exact, tol, method='all'):
