@@ -219,8 +219,8 @@ def main():
     ]
     
     # Tolleranze da testare
-    tolerances = [1e-4, 1e-6, 1e-8, 1e-10]
-    #1e-6, 1e-8, 1e-10
+    tolerances = [1e-4]
+    #, 1e-6, 1e-8, 1e-10
     
     print("========= Test di metodi iterativi per sistemi lineari =========")
     print("Matrici da testare:", [os.path.basename(mtx) for mtx in matrix_files])
@@ -229,23 +229,47 @@ def main():
     # Esegui i test
     results = IterativeSolvers.run_tests(matrix_files, tolerances)
     
-    # Stampa un riepilogo dei risultati
+    # Stampa un riepilogo dei risultati in formato tabella
     print("\n=========  RIEPILOGO DEI RISULTATI =========")
+    
     for mtx_file, mtx_results in results.items():
-        print(f"\nRisultati per la matrice: {os.path.basename(mtx_file)}")
+        mtx_name = os.path.basename(mtx_file)
         
         for tol, methods_results in mtx_results.items():
-            print(f"\n  Tolleranza: {tol}")
+            print(f"\n RISULTATI FINALI  - {mtx_name} (tol={tol:.0e})")
             
-            for method, result in methods_results.items(): 
-                print(f"    {method.upper()}:")
-                print(f"      Iterazioni: {result['iterations']}")
-                print(f"      Tempo: {result['time']:.6f} sec")
-                print(f"      Errore soluzione: {result['solution_error']:.6e}")
-                print(f"      Errore residuo: {result['residual_error']:.6e}")
+            # Definisci l'intestazione della tabella con allineamento corretto
+            print("Metodo              | Iterazioni | Tempo (s) | Errore Finale | Errore Relativo")
+            print("-" * 75)
+            
+            # Definisci l'ordine dei metodi nella tabella
+            methods_order = ['jacobi', 'gauss_seidel', 'gradient', 'conjugate_gradient']
+            method_display_names = {
+                'jacobi': 'Jacobi',
+                'gauss_seidel': 'Gauss-Seidel',
+                'gradient': 'Gradiente',
+                'conjugate_gradient': 'Gradiente Coniugato'
+            }
+            
+            for method_key in methods_order:
+                if method_key in methods_results:
+                    result = methods_results[method_key]
+                    method_name = method_display_names[method_key]
+                    
+                    # Formatta i valori per l'output con allineamento corretto
+                    iterations = str(result['iterations']).rjust(10)#serve per allineare a destra una stringa, aggiungendo spazi 
+                    time = f"{result['time']:.4f}".rjust(9)
+                    sol_error = f"{result['solution_error']:.2e}".rjust(13)
+                    res_error = f"{result['residual_error']:.2e}".rjust(15)
+                    
+                    # Metodo con larghezza fissa per allineamento
+                    method_padded = method_name.ljust(20)
+                    
+                    # Stampa la riga della tabella con allineamento corretto
+                    print(f"{method_padded}| {iterations} | {time} | {sol_error} | {res_error}")
     
     # Mostra i grafici
-    plot_results(results)
+    #plot_results(results)
 
 
 if __name__ == "__main__":
